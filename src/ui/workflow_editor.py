@@ -4,7 +4,7 @@ JSON fica por baixo dos panos.
 """
 import json
 from pathlib import Path
-from tkinter import ttk, messagebox, Toplevel, StringVar
+from tkinter import ttk, messagebox, Toplevel, StringVar, Text, END, Scrollbar
 
 from src.core.entity.workflow import Workflow
 from src.core.entity.browser import Browser, BrowserType
@@ -93,12 +93,9 @@ class WorkflowEditor(ttk.Frame):
         ttk.Entry(top, textvariable=self.name_var, width=20).pack(side="left", padx=(0, 15))
 
         self.mode_var = StringVar(value="steps")
-        ttk.Radiobutton(top, text="A partir de steps", variable=self.mode_var, value="steps", command=self._toggle_mode).pack(side="left", padx=5)
-        ttk.Radiobutton(top, text="Editar actions manualmente", variable=self.mode_var, value="manual", command=self._toggle_mode).pack(side="left", padx=5)
-
         ttk.Button(top, text="Novo", command=self._new).pack(side="left", padx=2)
         ttk.Button(top, text="Salvar", command=self._save).pack(side="left", padx=2)
-        ttk.Button(top, text="Carregar", command=self._load_selected).pack(side="left", padx=2)
+        ttk.Button(top, text="Visualizar código", command=self._show_code).pack(side="left", padx=2)
 
         # Modo steps
         self.steps_frame = ttk.LabelFrame(self, text="Steps (clique + para adicionar, arraste para reordenar)")
@@ -112,9 +109,6 @@ class WorkflowEditor(ttk.Frame):
         ttk.Button(sb, text="Subir", command=self._move_step_up).pack(side="left", padx=2)
         ttk.Button(sb, text="Descer", command=self._move_step_down).pack(side="left", padx=2)
 
-        ttk.Label(self.steps_frame, text="URL (opcional):").pack(anchor="w", padx=5, pady=(2, 0))
-        self.url_var = StringVar()
-        ttk.Entry(self.steps_frame, textvariable=self.url_var, width=50).pack(fill="x", padx=5, pady=2)
         ttk.Label(self.steps_frame, text="Browser:").pack(anchor="w", padx=5, pady=(2, 0))
         self.browser_var = StringVar(value="chromium")
         ttk.Combobox(self.steps_frame, textvariable=self.browser_var, values=["chromium", "firefox", "webkit"], width=15).pack(anchor="w", padx=5, pady=2)
@@ -123,9 +117,6 @@ class WorkflowEditor(ttk.Frame):
         self.manual_frame = ttk.LabelFrame(self, text="Actions do workflow")
         mf_top = ttk.Frame(self.manual_frame)
         mf_top.pack(fill="x", padx=5, pady=5)
-        ttk.Label(mf_top, text="URL:").pack(side="left", padx=(0, 5))
-        self.manual_url_var = StringVar(value="https://example.com")
-        ttk.Entry(mf_top, textvariable=self.manual_url_var, width=45).pack(side="left", padx=(0, 15))
         ttk.Label(mf_top, text="Browser:").pack(side="left", padx=(0, 5))
         self.manual_browser_var = StringVar(value="chromium")
         ttk.Combobox(mf_top, textvariable=self.manual_browser_var, values=["chromium", "firefox", "webkit"], width=12).pack(side="left")
@@ -216,6 +207,35 @@ class WorkflowEditor(ttk.Frame):
         for c in self.action_cards:
             c.pack(fill="x", pady=3)
 
+    def _show_code(self):
+        """Abre janela com o JSON do workflow atual (editor ou arquivo carregado)."""
+        workflow = self.get_workflow()
+        if workflow is None and self.current_path:
+            try:
+                with open(self.current_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                workflow = Workflow.model_validate(data)
+            except Exception:
+                pass
+        if workflow is None:
+            messagebox.showinfo("Visualizar código", "Nenhum workflow para exibir. Adicione steps ou carregue um workflow.")
+            return
+        win = Toplevel(self.winfo_toplevel())
+        win.title("Código do workflow (JSON)")
+        win.geometry("700x500")
+        win.minsize(400, 300)
+        f = ttk.Frame(win, padding=5)
+        f.pack(fill="both", expand=True)
+        txt = Text(f, wrap="word", font=("Consolas", 10), state="disabled")
+        txt.pack(side="left", fill="both", expand=True)
+        scroll = Scrollbar(f, command=txt.yview)
+        scroll.pack(side="right", fill="y")
+        txt.configure(yscrollcommand=scroll.set)
+        code = json.dumps(workflow.model_dump(mode="json"), indent=2, ensure_ascii=False)
+        txt.configure(state="normal")
+        txt.insert("1.0", code)
+        txt.configure(state="disabled")
+
     def _get_selected_workflow(self) -> str | None:
         if self.app and hasattr(self.app, "get_selected_workflow"):
             return self.app.get_selected_workflow()
@@ -254,7 +274,6 @@ class WorkflowEditor(ttk.Frame):
         self.current_path = None
         self.name_var.set("")
         self.steps_listbox.delete(*self.steps_listbox.get_children())
-        self.url_var.set("")
         self.browser_var.set("chromium")
         for card in self.action_cards[:]:
             card.destroy()
@@ -275,7 +294,6 @@ class WorkflowEditor(ttk.Frame):
                     return
                 workflow = MakeWorkflowByStep.make(
                     steps_paths,
-                    url=self.url_var.get().strip() or None,
                     browser_type=self.browser_var.get(),
                     output_name=name,
                 )
@@ -284,8 +302,7 @@ class WorkflowEditor(ttk.Frame):
                 if not actions:
                     messagebox.showwarning("Salvar", "Adicione pelo menos uma action.")
                     return
-                url = self.manual_url_var.get().strip() or "about:blank"
-                page = Page(url=url, actions=[Action(**a) for a in actions])
+                page = Page(url="about:blank", actions=[Action(**a) for a in actions])
                 browser = Browser(btype=BrowserType(self.manual_browser_var.get()), pages=[page])
                 workflow = Workflow(browsers=[browser])
                 path = self.workflows_dir / f"{name}.json"
@@ -298,6 +315,11 @@ class WorkflowEditor(ttk.Frame):
         except Exception as e:
             messagebox.showerror("Erro", str(e))
 
+    def get_current_name(self) -> str | None:
+        if self.current_path:
+            return Path(self.current_path).stem
+        return self.name_var.get().strip() or None
+
     def get_workflow(self) -> Workflow | None:
         try:
             if self.mode_var.get() == "steps":
@@ -306,7 +328,6 @@ class WorkflowEditor(ttk.Frame):
                     return None
                 return MakeWorkflowByStep.make(
                     steps_paths,
-                    url=self.url_var.get().strip() or None,
                     browser_type=self.browser_var.get(),
                     output_name="temp",
                     save=False,
@@ -315,8 +336,7 @@ class WorkflowEditor(ttk.Frame):
                 actions = [c.get_data() for c in self.action_cards]
                 if not actions:
                     return None
-                url = self.manual_url_var.get().strip() or "about:blank"
-                page = Page(url=url, actions=[Action(**a) for a in actions])
+                page = Page(url="about:blank", actions=[Action(**a) for a in actions])
                 browser = Browser(btype=BrowserType(self.manual_browser_var.get()), pages=[page])
                 return Workflow(browsers=[browser])
         except Exception:

@@ -1,6 +1,3 @@
-"""
-Executor de workflows com captura de stdout em tempo real.
-"""
 import queue
 import sys
 import threading
@@ -15,7 +12,6 @@ from src.core.workers.page_worker import PageWorker
 
 
 class StreamQueue:
-    """Redireciona writes para uma queue."""
 
     def __init__(self, log_queue: queue.Queue):
         self.log_queue = log_queue
@@ -29,10 +25,6 @@ class StreamQueue:
 
 
 def run_workflow(workflow: Workflow, log_queue: queue.Queue, on_done: Callable[[bool, str | None], None]):
-    """
-    Executa workflow em thread, redirecionando print para log_queue.
-    Chama on_done(success, error_message) ao terminar.
-    """
     def _run():
         old_stdout = sys.stdout
         old_stderr = sys.stderr

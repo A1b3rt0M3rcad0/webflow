@@ -1,11 +1,8 @@
-"""
-Janela principal da UI WebFlow.
-"""
 import json
 import queue
 import os
 from pathlib import Path
-from tkinter import ttk, messagebox, Text, END
+from tkinter import ttk, messagebox, Toplevel
 
 from src.ui.runner import run_workflow
 from src.ui.step_editor import StepEditor
@@ -32,13 +29,54 @@ def safe_find_workflows() -> list[str]:
         return []
 
 
+def _open_run_console(parent, title: str):
+    win = Toplevel(parent)
+    win.title(title)
+    win.geometry("900x550")
+    win.minsize(500, 350)
+    q = queue.Queue()
+
+    frame = ttk.Frame(win, padding=8)
+    frame.pack(fill="both", expand=True)
+    # Terminal: fundo escuro, fonte monoespaçada
+    text = Text(
+        frame,
+        wrap="word",
+        state="disabled",
+        font=("Consolas", 11),
+        bg="#0c0c0c",
+        fg="#cccccc",
+        insertbackground="#cccccc",
+        selectbackground="#264f78",
+    )
+    text.pack(fill="both", expand=True)
+    scroll = ttk.Scrollbar(frame, command=text.yview)
+    scroll.pack(side="right", fill="y")
+    text.configure(yscrollcommand=scroll.set)
+    ttk.Button(frame, text="Fechar", command=win.destroy).pack(pady=6)
+
+    def poll():
+        try:
+            while True:
+                s = q.get_nowait()
+                text.configure(state="normal")
+                text.insert(END, s)
+                text.see(END)
+                text.configure(state="disabled")
+        except queue.Empty:
+            pass
+        if win.winfo_exists():
+            win.after(50, poll)
+
+    win.after(50, poll)
+    return q
+
+
 class App(ttk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.log_queue: queue.Queue = queue.Queue()
         self._build_ui()
         self._refresh_lists()
-        self._poll_log()
 
     def _build_ui(self):
         # Painel esquerdo: listas
@@ -60,6 +98,8 @@ class App(ttk.Frame):
         self.workflows_listbox.bind("<<TreeviewSelect>>", self._on_workflow_select)
         self.workflows_listbox.bind("<Double-1>", lambda e: self._load_workflow())
 
+        ttk.Button(left, text="Deletar workflow", command=self._delete_selected_workflow).pack(fill="x", pady=2)
+
         ttk.Button(left, text="Atualizar listas", command=self._refresh_lists).pack(pady=5)
 
         # Painel central: notebook (Steps / Workflows)
@@ -69,7 +109,7 @@ class App(ttk.Frame):
         self.notebook = ttk.Notebook(center)
         self.notebook.pack(fill="both", expand=True)
 
-        self.step_editor = StepEditor(center, on_save=self._refresh_lists, app=self)
+        self.step_editor = StepEditor(center, on_save=self._refresh_lists, on_test=self._run_step_test, app=self)
         self.notebook.add(self.step_editor, text="Step")
 
         self.workflow_editor = WorkflowEditor(
@@ -83,29 +123,21 @@ class App(ttk.Frame):
         # Botões de ação (visíveis em ambas as abas)
         btn_frame = ttk.Frame(center)
         btn_frame.pack(fill="x", pady=5)
-        ttk.Button(btn_frame, text="Testar", command=self._run_current).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="Salvar", command=self._save_current).pack(side="left", padx=2)
-
-        # Painel inferior: log
-        log_frame = ttk.LabelFrame(self, text="Log / Saída")
-        log_frame.pack(side="bottom", fill="both", expand=True, padx=5, pady=5)
-        self.log_text = Text(log_frame, height=10, wrap="word", state="disabled")
-        self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
-        scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
-        scroll.pack(side="right", fill="y")
-        self.log_text.configure(yscrollcommand=scroll.set)
-        ttk.Button(log_frame, text="Limpar log", command=self._clear_log).pack(pady=2)
+        ttk.Button(btn_frame, text="Executar workflow selecionado", command=self._run_selected_workflow).pack(side="left", padx=2)
 
     def _refresh_lists(self):
         for c in self.steps_listbox.get_children():
             self.steps_listbox.delete(c)
         for p in safe_find_steps():
-            self.steps_listbox.insert("", "end", text=Path(p).name, values=(p,))
+            path_abs = str(Path(p).resolve())
+            self.steps_listbox.insert("", "end", text=Path(p).name, values=(path_abs,))
 
         for c in self.workflows_listbox.get_children():
             self.workflows_listbox.delete(c)
         for p in safe_find_workflows():
-            self.workflows_listbox.insert("", "end", text=Path(p).name, values=(p,))
+            path_abs = str(Path(p).resolve())
+            self.workflows_listbox.insert("", "end", text=Path(p).name, values=(path_abs,))
 
     def get_selected_step(self) -> str | None:
         sel = self.steps_listbox.selection()
@@ -115,8 +147,18 @@ class App(ttk.Frame):
 
     def get_selected_workflow(self) -> str | None:
         sel = self.workflows_listbox.selection()
-        if sel:
-            return self.workflows_listbox.item(sel[0])["values"][0]
+        if not sel:
+            return None
+        item = self.workflows_listbox.item(sel[0])
+        vals = item.get("values") or ()
+        if vals:
+            return vals[0]
+        # Fallback: reconstruir path pelo nome (coluna #0)
+        name = item.get("text") or ""
+        if name:
+            for p in safe_find_workflows():
+                if Path(p).name == name:
+                    return str(Path(p).resolve())
         return None
 
     def _on_step_select(self, event):
@@ -137,51 +179,70 @@ class App(ttk.Frame):
             self.notebook.select(1)
             self.workflow_editor._load(path)
 
-    def _clear_log(self):
-        self.log_text.configure(state="normal")
-        self.log_text.delete("1.0", END)
-        self.log_text.configure(state="disabled")
-
-    def _log(self, text: str):
-        self.log_text.configure(state="normal")
-        self.log_text.insert(END, text)
-        self.log_text.see(END)
-        self.log_text.configure(state="disabled")
-
-    def _poll_log(self):
-        try:
-            while True:
-                text = self.log_queue.get_nowait()
-                self._log(text)
-        except queue.Empty:
-            pass
-        self.after(100, self._poll_log)
-
-    def _run_current(self):
-        """Testa o step ou workflow da aba atual."""
-        if self.notebook.index(self.notebook.select()) == 0:
-            workflow = self.step_editor.get_workflow_for_test()
-        else:
-            workflow = self.workflow_editor.get_workflow()
-        if workflow is None:
-            messagebox.showerror("Testar", "Step ou workflow inválido. Adicione actions ou steps.")
+    def _delete_selected_workflow(self):
+        path = self.get_selected_workflow()
+        if not path:
+            messagebox.showinfo("Deletar", "Selecione um workflow na lista à esquerda.")
             return
-        self._log("\n--- Iniciando teste ---\n")
+        path_obj = Path(path)
+        if not path_obj.exists():
+            messagebox.showerror("Deletar", f"Arquivo não encontrado: {path}")
+            self._refresh_lists()
+            return
+        if not messagebox.askyesno("Deletar workflow", f"Deletar o workflow \"{path_obj.name}\"?\n\nO arquivo será removido permanentemente."):
+            return
+        try:
+            path_obj.unlink()
+            self._refresh_lists()
+            messagebox.showinfo("Deletar", f"Workflow \"{path_obj.name}\" removido.")
+        except OSError as e:
+            messagebox.showerror("Deletar", f"Não foi possível remover: {e}")
+
+    def _run_step_test(self):
+        """Testa o step da aba Step. Abre console estilo terminal."""
+        workflow = self.step_editor.get_workflow_for_test()
+        if workflow is None:
+            messagebox.showerror("Testar", "Step inválido. Adicione actions.")
+            return
+        name = self.step_editor.get_current_name() or "Step (teste)"
+        log_queue = _open_run_console(self.winfo_toplevel(), f"Executando: {name}")
+        log_queue.put("\n--- Iniciando teste ---\n")
         run_workflow(
             workflow,
-            self.log_queue,
-            on_done=lambda ok, err: self.after(0, lambda: self._on_run_done(ok, err)),
+            log_queue,
+            on_done=lambda ok, err: self._console_done(log_queue, ok, err),
+        )
+
+    def _run_selected_workflow(self):
+        path = self.get_selected_workflow()
+        if not path:
+            messagebox.showinfo("Executar", "Selecione um workflow na lista à esquerda.")
+            return
+        try:
+            from src.utils.workflow_runner import load_workflow_from_json
+            path_resolved = str(Path(path).resolve())
+            workflow = load_workflow_from_json(path_resolved)
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
+            return
+        name = Path(path).name
+        log_queue = _open_run_console(self.winfo_toplevel(), f"Executando: {name}")
+        log_queue.put(f"\n--- Executando {name} ---\n")
+        run_workflow(
+            workflow,
+            log_queue,
+            on_done=lambda ok, err: self._console_done(log_queue, ok, err),
         )
 
     def _save_current(self):
-        """Salva o step ou workflow da aba atual."""
         if self.notebook.index(self.notebook.select()) == 0:
             self.step_editor._save()
         else:
             self.workflow_editor._save()
 
-    def _on_run_done(self, ok: bool, err: str | None):
+    def _console_done(self, log_queue: queue.Queue, ok: bool, err: str | None):
         if ok:
-            self._log("\n--- Execução concluída ---\n")
+            log_queue.put("\n--- Execução concluída ---\n")
         else:
-            self._log(f"\n--- Erro: {err} ---\n")
+            log_queue.put(f"\n--- Erro: {err} ---\n")
+

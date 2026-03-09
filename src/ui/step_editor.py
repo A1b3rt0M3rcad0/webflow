@@ -1,7 +1,3 @@
-"""
-Editor de steps - clique para adicionar actions, formulários para params.
-JSON fica por baixo dos panos.
-"""
 import json
 from pathlib import Path
 from tkinter import ttk, messagebox, StringVar
@@ -18,7 +14,6 @@ from src.ui.action_form import (
 
 
 class ActionCard(ttk.Frame):
-    """Um card de action com tipo + form de params."""
 
     def __init__(self, parent, action_data: dict, on_remove, on_change, **kwargs):
         super().__init__(parent, **kwargs)
@@ -67,11 +62,12 @@ class ActionCard(ttk.Frame):
 
 
 class StepEditor(ttk.Frame):
-    def __init__(self, parent, steps_dir: str = "steps", on_save=None, app=None, **kwargs):
+    def __init__(self, parent, steps_dir: str = "steps", on_save=None, on_test=None, app=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.steps_dir = Path(steps_dir)
         self.steps_dir.mkdir(parents=True, exist_ok=True)
         self.on_save = on_save
+        self.on_test = on_test
         self.app = app
         self.current_path: str | None = None
         self.action_cards: list[ActionCard] = []
@@ -81,17 +77,18 @@ class StepEditor(ttk.Frame):
         top = ttk.Frame(self)
         top.pack(fill="x", padx=5, pady=5)
 
-        ttk.Label(top, text="Nome do step:").pack(side="left", padx=(0, 5))
+        row0 = ttk.Frame(top)
+        row0.pack(fill="x", pady=(0, 6))
+        ttk.Label(row0, text="Nome do step:").pack(side="left", padx=(0, 5))
         self.name_var = StringVar()
-        ttk.Entry(top, textvariable=self.name_var, width=30).pack(side="left", padx=(0, 10))
+        ttk.Entry(row0, textvariable=self.name_var, width=30).pack(side="left", padx=(0, 10))
 
-        ttk.Label(top, text="URL (opcional):").pack(side="left", padx=(15, 5))
-        self.url_var = StringVar()
-        ttk.Entry(top, textvariable=self.url_var, width=35).pack(side="left", padx=(0, 10))
-
-        ttk.Button(top, text="Novo", command=self._new).pack(side="left", padx=2)
-        ttk.Button(top, text="Salvar step", command=self._save).pack(side="left", padx=2)
-        ttk.Button(top, text="Carregar", command=self._load_selected).pack(side="left", padx=2)
+        row1 = ttk.Frame(top)
+        row1.pack(fill="x")
+        ttk.Button(row1, text="Novo", command=self._new).pack(side="left", padx=2)
+        ttk.Button(row1, text="Salvar step", command=self._save).pack(side="left", padx=2)
+        ttk.Button(row1, text="Testar", command=self._on_test).pack(side="left", padx=2)
+        ttk.Button(row1, text="Carregar", command=self._load_selected).pack(side="left", padx=2)
 
         actions_frame = ttk.LabelFrame(self, text="Actions (clique em + para adicionar)")
         actions_frame.pack(fill="both", expand=True, padx=5, pady=5)
@@ -140,6 +137,10 @@ class StepEditor(ttk.Frame):
         for card in self.action_cards:
             card.pack(fill="x", pady=5)
 
+    def _on_test(self):
+        if self.on_test:
+            self.on_test()
+
     def _get_selected_step(self) -> str | None:
         if self.app and hasattr(self.app, "get_selected_step"):
             return self.app.get_selected_step()
@@ -155,7 +156,6 @@ class StepEditor(ttk.Frame):
     def _new(self):
         self.current_path = None
         self.name_var.set("")
-        self.url_var.set("")
         for card in self.action_cards[:]:
             card.destroy()
         self.action_cards.clear()
@@ -173,7 +173,6 @@ class StepEditor(ttk.Frame):
                 raise ValueError("Step inválido: falta 'actions'")
             self.current_path = path
             self.name_var.set(p.stem)
-            self.url_var.set(data.get("url", ""))
             for card in self.action_cards[:]:
                 card.destroy()
             self.action_cards.clear()
@@ -203,22 +202,23 @@ class StepEditor(ttk.Frame):
             messagebox.showerror("Erro", str(e))
 
     def _to_dict(self) -> dict:
-        url = self.url_var.get().strip()
-        data = {"actions": [c.get_data() for c in self.action_cards]}
-        if url:
-            data["url"] = url
-        return data
+        return {"actions": [c.get_data() for c in self.action_cards]}
 
     def get_data(self) -> dict | None:
         return self._to_dict()
+
+    def get_current_name(self) -> str | None:
+        """Nome do step atual (arquivo ou campo Nome)."""
+        if self.current_path:
+            return Path(self.current_path).stem
+        return self.name_var.get().strip() or None
 
     def get_workflow_for_test(self) -> Workflow | None:
         """Constrói um workflow temporário a partir do step para testar."""
         data = self._to_dict()
         if not data.get("actions"):
             return None
-        url = self.url_var.get().strip() or "about:blank"
         actions = [Action(**a) for a in data["actions"]]
-        page = Page(url=url, actions=actions)
+        page = Page(url="about:blank", actions=actions)
         browser = Browser(btype=BrowserType.CHROMIUM, pages=[page])
         return Workflow(browsers=[browser])
