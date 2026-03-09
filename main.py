@@ -16,15 +16,18 @@ def _ensure_playwright_browsers():
             browser = p.chromium.launch(headless=True)
             browser.close()
     except Exception:
+        print("Playwright browsers não instalados, instalando...")
         subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
             check=False,
         )
+        print("Playwright browsers instalados")
 
 
 def main():
+    print("Iniciando WebFlow...")
     _ensure_playwright_browsers()
+    print("WebFlow iniciado")
     root = tk.Tk()
     root.title("WebFlow - Gerenciador de Workflows")
     root.geometry("900x700")
