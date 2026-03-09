@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from tkinter import ttk, messagebox, StringVar
+from tkinter import ttk, messagebox, StringVar, Canvas
 
 from src.core.entity.workflow import Workflow
 from src.core.entity.browser import Browser, BrowserType
@@ -93,8 +93,38 @@ class StepEditor(ttk.Frame):
         actions_frame = ttk.LabelFrame(self, text="Actions (clique em + para adicionar)")
         actions_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        self.cards_container = ttk.Frame(actions_frame)
-        self.cards_container.pack(fill="both", expand=True, padx=5, pady=5)
+        scroll_container = ttk.Frame(actions_frame)
+        scroll_container.pack(fill="both", expand=True, padx=5, pady=(5, 0))
+        canvas = Canvas(scroll_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(scroll_container, command=canvas.yview)
+        self.cards_container = ttk.Frame(canvas)
+        self._actions_canvas = canvas
+        self._actions_canvas_window = canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+        def _update_scroll_region(*_):
+            bbox = canvas.bbox("all")
+            if not bbox:
+                return
+            x1, y1, x2, y2 = bbox
+            cw, ch = canvas.winfo_width(), canvas.winfo_height()
+            content_h = y2 - y1
+            # Região de scroll no mínimo do tamanho do viewport: evita rolar "para cima" com pouco conteúdo
+            scroll_h = max(ch, content_h)
+            scroll_w = max(cw, x2 - x1)
+            canvas.configure(scrollregion=(0, 0, scroll_w, scroll_h))
+            if content_h <= ch:
+                canvas.yview_moveto(0)
+
+        def _on_canvas_configure(e):
+            canvas.itemconfig(self._actions_canvas_window, width=e.width)
+            canvas.after_idle(_update_scroll_region)
+
+        self.cards_container.bind("<Configure>", lambda e: canvas.after_idle(_update_scroll_region))
+        canvas.bind("<Configure>", _on_canvas_configure)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
         scroll_frame = ttk.Frame(actions_frame)
         scroll_frame.pack(fill="x", padx=5, pady=5)

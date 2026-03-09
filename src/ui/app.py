@@ -2,7 +2,7 @@ import json
 import queue
 import os
 from pathlib import Path
-from tkinter import ttk, messagebox, Toplevel, Text, END
+from tkinter import ttk, messagebox, Toplevel, Text, END, Canvas
 
 from src.ui.runner import run_workflow
 from src.ui.step_editor import StepEditor
@@ -77,6 +77,7 @@ def _show_template_dialog(parent, vars_list: list[str], title: str = "Preencher 
     """
     Mostra diálogo para preencher valores de {{var}}.
     Retorna dict com os valores ou None se cancelado.
+    Área dos campos é rolável quando há muitas variáveis.
     """
     result: dict[str, str] | None = None
     entries: dict[str, ttk.Entry] = {}
@@ -85,18 +86,46 @@ def _show_template_dialog(parent, vars_list: list[str], title: str = "Preencher 
     win.title(title)
     win.transient(parent)
     win.grab_set()
-    win.resizable(False, False)
+    win.resizable(True, True)
+    win.minsize(450, 220)
 
     f = ttk.Frame(win, padding=15)
-    f.pack(fill="x")
+    f.pack(fill="both", expand=True)
     ttk.Label(f, text="Preencha os valores dos templates antes de executar:").pack(anchor="w", pady=(0, 10))
+
+    # Área rolável para os campos
+    scroll_container = ttk.Frame(f)
+    scroll_container.pack(fill="both", expand=True)
+    canvas = Canvas(scroll_container, highlightthickness=0)
+    scrollbar = ttk.Scrollbar(scroll_container, command=canvas.yview)
+    inner = ttk.Frame(canvas)
+    inner.bind(
+        "<Configure>",
+        lambda e: (canvas.configure(scrollregion=canvas.bbox("all")), canvas.configure(width=e.width)),
+    )
+    canvas_window = canvas.create_window((0, 0), window=inner, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    def _on_canvas_configure(e):
+        canvas.itemconfig(canvas_window, width=e.width)
+
+    canvas.bind("<Configure>", _on_canvas_configure)
+
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    canvas.bind("<MouseWheel>", _on_mousewheel)
+
     for var in sorted(vars_list):
-        row = ttk.Frame(f)
+        row = ttk.Frame(inner)
         row.pack(fill="x", pady=3)
         ttk.Label(row, text=f"{{{{{var}}}}}:", width=20, anchor="w").pack(side="left", padx=(0, 8))
         e = ttk.Entry(row, width=35)
         e.pack(side="left", fill="x", expand=True)
         entries[var] = e
+
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
 
     def on_ok():
         nonlocal result
@@ -107,11 +136,11 @@ def _show_template_dialog(parent, vars_list: list[str], title: str = "Preencher 
         win.destroy()
 
     btn_f = ttk.Frame(f)
-    btn_f.pack(fill="x", pady=(15, 0))
+    btn_f.pack(fill="x", pady=(10, 0))
     ttk.Button(btn_f, text="Executar", command=on_ok).pack(side="left", padx=2)
     ttk.Button(btn_f, text="Cancelar", command=on_cancel).pack(side="left", padx=2)
 
-    win.geometry("450x200")
+    win.geometry("450x280")
     parent.wait_window(win)
     return result
 

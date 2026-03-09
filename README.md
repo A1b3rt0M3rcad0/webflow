@@ -1,6 +1,6 @@
 # WebFlow
 
-Interface gráfica para criar e executar workflows de automação no navegador usando **Playwright**. Você monta **steps** (ações isoladas), combina em **workflows** e roda tudo com um clique; a saída aparece em uma janela tipo terminal.
+Software para criar e executar workflows de automação no navegador usando **Playwright**. Você monta **steps** (ações isoladas), combina em **workflows** e roda tudo com um clique; a saída aparece em uma janela tipo terminal.
 
 ---
 
@@ -84,7 +84,7 @@ Seletores são **CSS** (ex.: `button#submit`, `input[name="email"]`, `.classe`).
 
 ## Templates
 
-Você pode usar **variáveis** em qualquer parâmetro de action (URL, texto, selector, etc.) com a sintaxe `{{nome_var}}`. Ao executar um step ou workflow, uma janela pede os valores dessas variáveis antes de rodar.
+Você pode usar **variáveis** em qualquer parâmetro de action (URL, texto, selector, etc.) com a sintaxe `{{nome_var}}`. Ao executar um workflow, uma janela pede os valores dessas variáveis antes de rodar.
 
 **Exemplo** — step com template em `url` e `text`:
 

@@ -4,7 +4,7 @@ JSON fica por baixo dos panos.
 """
 import json
 from pathlib import Path
-from tkinter import ttk, messagebox, Toplevel, StringVar, Text, END, Scrollbar
+from tkinter import ttk, messagebox, Toplevel, StringVar, Text, END, Canvas
 
 from src.core.entity.workflow import Workflow
 from src.core.entity.browser import Browser, BrowserType
@@ -120,8 +120,37 @@ class WorkflowEditor(ttk.Frame):
         ttk.Label(mf_top, text="Browser:").pack(side="left", padx=(0, 5))
         self.manual_browser_var = StringVar(value="chromium")
         ttk.Combobox(mf_top, textvariable=self.manual_browser_var, values=["chromium", "firefox", "webkit"], width=12).pack(side="left")
-        self.manual_container = ttk.Frame(self.manual_frame)
-        self.manual_container.pack(fill="both", expand=True, padx=5, pady=5)
+        scroll_container = ttk.Frame(self.manual_frame)
+        scroll_container.pack(fill="both", expand=True, padx=5, pady=(5, 0))
+        canvas = Canvas(scroll_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(scroll_container, command=canvas.yview)
+        self.manual_container = ttk.Frame(canvas)
+        self._manual_canvas = canvas
+        self._manual_canvas_window = canvas.create_window((0, 0), window=self.manual_container, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+        def _update_scroll_region(*_):
+            bbox = canvas.bbox("all")
+            if not bbox:
+                return
+            x1, y1, x2, y2 = bbox
+            cw, ch = canvas.winfo_width(), canvas.winfo_height()
+            content_h = y2 - y1
+            scroll_h = max(ch, content_h)
+            scroll_w = max(cw, x2 - x1)
+            canvas.configure(scrollregion=(0, 0, scroll_w, scroll_h))
+            if content_h <= ch:
+                canvas.yview_moveto(0)
+
+        def _on_canvas_configure(e):
+            canvas.itemconfig(self._manual_canvas_window, width=e.width)
+            canvas.after_idle(_update_scroll_region)
+
+        self.manual_container.bind("<Configure>", lambda e: canvas.after_idle(_update_scroll_region))
+        canvas.bind("<Configure>", _on_canvas_configure)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
         ttk.Button(self.manual_frame, text="+ Adicionar action", command=self._add_manual_action).pack(padx=5, pady=5)
 
         self._toggle_mode()
