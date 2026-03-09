@@ -20,6 +20,7 @@ class MakeWorkflowByStep:
         url: str | None = None,
         browser_type: BrowserType | str = None,
         output_name: str | None = None,
+        save: bool = True,
     ) -> Workflow:
 
         all_actions: list[Action] = []
@@ -54,8 +55,8 @@ class MakeWorkflowByStep:
         page = Page(url=page_url, actions=all_actions)
         browser = Browser(btype=btype, pages=[page])
         workflow = Workflow(browsers=[browser])
-
-        cls._save(workflow, steps_paths, output_name)
+        if save:
+            cls._save(workflow, steps_paths, output_name)
         return workflow
 
     @classmethod
