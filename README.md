@@ -2,6 +2,8 @@
 
 Software para criar e executar workflows de automação no navegador usando **Playwright**. Você monta **steps** (ações isoladas), combina em **workflows** e roda tudo com um clique; a saída aparece em uma janela tipo terminal.
 
+![interface gráfica](static/image.png)
+
 ---
 
 ## Requisitos
