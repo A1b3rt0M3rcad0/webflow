@@ -79,8 +79,73 @@ Um **workflow** é um JSON em `workflows/` que descreve um ou mais **browsers**,
 | **wait_for_selector** | Espera elemento aparecer | `selector`, `timeout` |
 | **get_element_data** | Lê texto/html/atributo de um elemento | `selector`, `data_type` (text/html/attribute/value), `attribute_name` (se for attribute) |
 | **solve_recaptcha_v2_and_inject** | Resolve reCAPTCHA v2 (2Captcha) e injeta o token na página | `sitekey` (opcional), `sitekey_selector` (ex: `[data-sitekey]`), `max_retries`. A URL da página é usada automaticamente. |
+| **if** | Executa ações condicionalmente baseado em uma condição | `condition` (objeto com tipo, seletor, valor, etc.), `then` (lista de ações se verdadeiro), `else_` (lista de ações se falso) |
 
 Seletores são **CSS** (ex.: `button#submit`, `input[name="email"]`, `.classe`).
+
+### Ação IF (Condicionais)
+
+A action **if** permite executar diferentes conjuntos de ações baseado em uma condição. Quando você adiciona uma action `if`, você define:
+
+1. **Condição**: Tipo de comparação (equals, contains, greater_than, etc.), seletor do elemento, tipo de dado a extrair (text, html, attribute, value, id, class) e valor esperado.
+2. **Bloco THEN**: Lista de ações executadas se a condição for verdadeira.
+3. **Bloco ELSE**: Lista de ações executadas se a condição for falsa.
+
+**Como usar na UI:**
+
+1. Adicione uma action e selecione o tipo **"if"**.
+2. Configure a condição (tipo, seletor, tipo de dado, valor).
+3. Clique em **"Editar Actions"** para abrir o editor de ações THEN/ELSE.
+4. Na janela modal, use as abas **THEN** e **ELSE** para adicionar ações em cada bloco.
+5. Clique em **Salvar** para fechar o editor e salvar as ações.
+
+**Exemplo de JSON:**
+
+```json
+{
+  "name": "if",
+  "params": {
+    "condition": {
+      "type": "equals",
+      "selector": "div.status",
+      "data_type": "text",
+      "value": "Sucesso"
+    },
+    "then": [
+      { "name": "screenshot", "params": { "path": "success.png" } },
+      { "name": "click", "params": { "selector": "button.next" } }
+    ],
+    "else_": [
+      { "name": "screenshot", "params": { "path": "error.png" } }
+    ]
+  }
+}
+```
+
+**Tipos de condição disponíveis:**
+
+- **equals**, **not_equals**: Igualdade de valores
+- **contains**, **not_contains**: Contém substring
+- **starts_with**, **ends_with**: Inicia/termina com
+- **regex_match**: Correspondência com expressão regular
+- **greater_than**, **less_than**, **greater_than_or_equal**, **less_than_or_equal**: Comparações numéricas
+- **is_empty**, **is_not_empty**: Verifica se está vazio
+- **exists**, **not_exists**: Verifica se elemento existe
+- **is_visible**, **is_hidden**: Verifica visibilidade
+- **is_enabled**, **is_disabled**: Verifica se está habilitado
+- **has_class**, **not_has_class**: Verifica classe CSS
+- **has_attribute**, **not_has_attribute**: Verifica atributo HTML
+- **attribute_equals**, **attribute_not_equals**, **attribute_contains**: Comparações de atributos
+- **count_equals**, **count_greater_than**, **count_less_than**: Comparações de contagem de elementos
+
+**Tipos de dado (`data_type`):**
+
+- **text**: Texto visível do elemento
+- **html**: HTML interno do elemento
+- **attribute**: Valor de um atributo HTML (especifique `attribute_name`)
+- **value**: Valor de inputs/selects
+- **id**: ID do elemento
+- **class**: Classes CSS do elemento
 
 ---
 
@@ -117,6 +182,7 @@ Ao executar, o sistema detecta `dominio` e `email` e abre um diálogo para preen
 - **Nome do step** + botões: **Novo**, **Salvar step**, **Testar**, **Carregar**.
 - **Actions**: lista de actions. Para cada uma: tipo (dropdown), parâmetros (formulário), botões Remover / Subir / Descer.
 - **+ Adicionar action**: adiciona nova action ao step.
+- **Ação IF**: Quando você seleciona a action "if", aparece um botão **"Editar Actions"** que abre uma janela modal com abas THEN/ELSE para adicionar ações condicionais.
 - **Testar**: roda o step atual em uma janela de console (terminal), sem salvar.
 - **Carregar**: abre o step selecionado na lista da esquerda.
 

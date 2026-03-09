@@ -22,5 +22,6 @@ def action_mapper(action_name: ActionType) -> Callable:
         ActionType.WAIT_FOR_SELECTOR: PageWorker.wait_for_selector,
         ActionType.GET_ELEMENT_DATA: PageWorker.get_element_data,
         ActionType.SOLVE_RECAPTCHA_V2_AND_INJECT: PageWorker.solve_recaptcha_v2_and_inject,
+        ActionType.IF: PageWorker.if_action,
     }
     return actions[action_name]

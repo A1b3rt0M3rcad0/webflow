@@ -12,6 +12,8 @@ from src.core.entity.page import Page
 from src.core.entity.page_actions import Action
 from src.utils.make_workflows_by_step import MakeWorkflowByStep
 from src.ui.action_form import build_action_params_form, get_params_from_form, ACTION_LABELS
+from src.ui.step_editor import IfActionCard
+from src.ui.step_editor import IfActionCard, IfActionsEditor
 
 
 class WorkflowActionCard(ttk.Frame):
@@ -57,7 +59,7 @@ class WorkflowActionCard(ttk.Frame):
         form_frame.pack(fill="x")
 
     def get_data(self) -> dict:
-        params = get_params_from_form(self.vars_dict)
+        params = get_params_from_form(self.vars_dict, self.action_data.get("name"))
         return {"name": self.type_var.get(), "params": params}
 
 
@@ -211,12 +213,21 @@ class WorkflowEditor(ttk.Frame):
 
     def _add_manual_action(self, action_data: dict | None = None):
         data = action_data or {"name": "goto", "params": {"url": "https://example.com"}}
-        card = WorkflowActionCard(
-            self.manual_container,
-            data,
-            on_remove=lambda: self._remove_action_card(card),
-            on_move=lambda direction: self._move_action_card(card, direction),
-        )
+        # Usar IfActionCard se for ação IF
+        if data.get("name") == "if":
+            card = IfActionCard(
+                self.manual_container,
+                data,
+                on_remove=lambda: self._remove_action_card(card),
+                on_change=lambda _: None,
+            )
+        else:
+            card = WorkflowActionCard(
+                self.manual_container,
+                data,
+                on_remove=lambda: self._remove_action_card(card),
+                on_move=lambda direction: self._move_action_card(card, direction),
+            )
         card.pack(fill="x", pady=3)
         self.action_cards.append(card)
 
@@ -255,9 +266,15 @@ class WorkflowEditor(ttk.Frame):
         win.minsize(400, 300)
         f = ttk.Frame(win, padding=5)
         f.pack(fill="both", expand=True)
-        txt = Text(f, wrap="word", font=("Consolas", 10), state="disabled")
+        
+        # Container para Text e Scrollbar
+        text_frame = ttk.Frame(f)
+        text_frame.pack(fill="both", expand=True)
+        
+        txt = Text(text_frame, wrap="word", font=("Consolas", 10), state="disabled")
         txt.pack(side="left", fill="both", expand=True)
-        scroll = Scrollbar(f, command=txt.yview)
+        
+        scroll = ttk.Scrollbar(text_frame, command=txt.yview)
         scroll.pack(side="right", fill="y")
         txt.configure(yscrollcommand=scroll.set)
         code = json.dumps(workflow.model_dump(mode="json"), indent=2, ensure_ascii=False)
