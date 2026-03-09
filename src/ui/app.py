@@ -2,7 +2,7 @@ import json
 import queue
 import os
 from pathlib import Path
-from tkinter import ttk, messagebox, Toplevel
+from tkinter import ttk, messagebox, Toplevel, Text, END
 
 from src.ui.runner import run_workflow
 from src.ui.step_editor import StepEditor

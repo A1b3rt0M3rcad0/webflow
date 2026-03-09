@@ -1,11 +1,5 @@
-"""
-Formulários dinâmicos para cada tipo de action.
-JSON fica por baixo dos panos - o usuário só preenche campos.
-"""
 from tkinter import ttk, StringVar, BooleanVar, IntVar
 
-# Definição dos campos por action: (label, key, widget_type, default, extra)
-# widget_type: "entry", "entry_int", "checkbox", "combo"
 ACTION_FIELDS = {
     "goto": [
         ("URL", "url", "entry", "https://example.com", None),
@@ -25,19 +19,18 @@ ACTION_FIELDS = {
         ("Forçar (inputs disabled)", "force", "checkbox", False, None),
     ],
     "wait_for_selector": [
-        ("Seletor", "selector", "entry", ".content", None),
+        ("Seletor", "selector", "entry", "div[class='content']", None),
         ("Timeout (ms)", "timeout", "entry_int", "10000", None),
     ],
     "get_element_data": [
-        ("Seletor", "selector", "entry", "div.result", None),
+        ("Seletor", "selector", "entry", "div[class='result']", None),
         ("Tipo de dado", "data_type", "combo", "text", ["text", "html", "attribute", "value"]),
         ("Nome do atributo (se data_type=attribute)", "attribute_name", "entry", "", None),
     ],
     "solve_recaptcha_v2_and_inject": [
-        ("Sitekey (ou deixe vazio)", "sitekey", "entry", "", None),
-        ("Seletor para obter sitekey (ex: [data-sitekey])", "sitekey_selector", "entry", "[data-sitekey]", None),
-        ("URL da página", "url", "entry", "", None),
-        ("Tentativas máximas", "max_retries", "entry_int", "5", None),
+        ("Sitekey", "sitekey", "entry", "", None),
+        ("Seletor sitekey", "sitekey_selector", "entry", "[data-sitekey]", None),
+        ("Tentativas", "max_retries", "entry_int", "5", None),
     ],
 }
 
@@ -54,10 +47,6 @@ ACTION_LABELS = {
 
 
 def build_action_params_form(parent, action_name: str, initial_params: dict | None) -> tuple[ttk.Frame, dict]:
-    """
-    Constrói o frame de params para uma action.
-    Retorna (frame, vars_dict) onde vars_dict mapeia key -> (var, widget_type).
-    """
     fields = ACTION_FIELDS.get(action_name, [])
     frame = ttk.Frame(parent)
     vars_dict = {}
@@ -89,7 +78,6 @@ def build_action_params_form(parent, action_name: str, initial_params: dict | No
 
 
 def get_params_from_form(vars_dict: dict) -> dict | None:
-    """Extrai params do formulário. None para actions sem params (ex: title)."""
     if not vars_dict:
         return None
     params = {}
