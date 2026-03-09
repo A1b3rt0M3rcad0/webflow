@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox, Toplevel, Text, END
 from src.ui.runner import run_workflow
 from src.ui.step_editor import StepEditor
 from src.ui.workflow_editor import WorkflowEditor
+from src.utils.template_utils import extract_template_vars, substitute_templates
 
 
 def safe_find_steps() -> list[str]:
@@ -70,6 +71,49 @@ def _open_run_console(parent, title: str):
 
     win.after(50, poll)
     return q
+
+
+def _show_template_dialog(parent, vars_list: list[str], title: str = "Preencher variáveis") -> dict[str, str] | None:
+    """
+    Mostra diálogo para preencher valores de {{var}}.
+    Retorna dict com os valores ou None se cancelado.
+    """
+    result: dict[str, str] | None = None
+    entries: dict[str, ttk.Entry] = {}
+
+    win = Toplevel(parent)
+    win.title(title)
+    win.transient(parent)
+    win.grab_set()
+    win.resizable(False, False)
+
+    f = ttk.Frame(win, padding=15)
+    f.pack(fill="x")
+    ttk.Label(f, text="Preencha os valores dos templates antes de executar:").pack(anchor="w", pady=(0, 10))
+    for var in sorted(vars_list):
+        row = ttk.Frame(f)
+        row.pack(fill="x", pady=3)
+        ttk.Label(row, text=f"{{{{{var}}}}}:", width=20, anchor="w").pack(side="left", padx=(0, 8))
+        e = ttk.Entry(row, width=35)
+        e.pack(side="left", fill="x", expand=True)
+        entries[var] = e
+
+    def on_ok():
+        nonlocal result
+        result = {var: e.get().strip() for var, e in entries.items()}
+        win.destroy()
+
+    def on_cancel():
+        win.destroy()
+
+    btn_f = ttk.Frame(f)
+    btn_f.pack(fill="x", pady=(15, 0))
+    ttk.Button(btn_f, text="Executar", command=on_ok).pack(side="left", padx=2)
+    ttk.Button(btn_f, text="Cancelar", command=on_cancel).pack(side="left", padx=2)
+
+    win.geometry("450x200")
+    parent.wait_window(win)
+    return result
 
 
 class App(ttk.Frame):
@@ -204,6 +248,9 @@ class App(ttk.Frame):
         if workflow is None:
             messagebox.showerror("Testar", "Step inválido. Adicione actions.")
             return
+        workflow = self._resolve_templates(workflow, "Step (teste)")
+        if workflow is None:
+            return
         name = self.step_editor.get_current_name() or "Step (teste)"
         log_queue = _open_run_console(self.winfo_toplevel(), f"Executando: {name}")
         log_queue.put("\n--- Iniciando teste ---\n")
@@ -226,6 +273,9 @@ class App(ttk.Frame):
             messagebox.showerror("Erro", str(e))
             return
         name = Path(path).name
+        workflow = self._resolve_templates(workflow, name)
+        if workflow is None:
+            return
         log_queue = _open_run_console(self.winfo_toplevel(), f"Executando: {name}")
         log_queue.put(f"\n--- Executando {name} ---\n")
         run_workflow(
@@ -239,6 +289,16 @@ class App(ttk.Frame):
             self.step_editor._save()
         else:
             self.workflow_editor._save()
+
+    def _resolve_templates(self, workflow, name: str):
+        """Se o workflow tem {{var}}, mostra diálogo para preencher. Retorna workflow com valores ou None se cancelado."""
+        vars_list = extract_template_vars(workflow)
+        if not vars_list:
+            return workflow
+        values = _show_template_dialog(self.winfo_toplevel(), list(vars_list), f"Preencher variáveis - {name}")
+        if values is None:
+            return None
+        return substitute_templates(workflow, values)
 
     def _console_done(self, log_queue: queue.Queue, ok: bool, err: str | None):
         if ok:

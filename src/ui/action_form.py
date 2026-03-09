@@ -2,7 +2,7 @@ from tkinter import ttk, StringVar, BooleanVar, IntVar
 
 ACTION_FIELDS = {
     "goto": [
-        ("URL", "url", "entry", "https://example.com", None),
+        ("URL ({{var}} = template)", "url", "entry", "https://example.com", None),
     ],
     "screenshot": [
         ("Caminho do arquivo", "path", "entry", "screenshot.png", None),
@@ -14,7 +14,7 @@ ACTION_FIELDS = {
     ],
     "fill": [
         ("Seletor", "selector", "entry", "input[name='email']", None),
-        ("Texto", "text", "entry", "", None),
+        ("Texto ({{var}} = template)", "text", "entry", "", None),
         ("Delay entre teclas (ms, 0=instantâneo)", "delay", "entry_int", "", None),
         ("Forçar (inputs disabled)", "force", "checkbox", False, None),
     ],

@@ -82,6 +82,25 @@ Seletores são **CSS** (ex.: `button#submit`, `input[name="email"]`, `.classe`).
 
 ---
 
+## Templates
+
+Você pode usar **variáveis** em qualquer parâmetro de action (URL, texto, selector, etc.) com a sintaxe `{{nome_var}}`. Ao executar um step ou workflow, uma janela pede os valores dessas variáveis antes de rodar.
+
+**Exemplo** — step com template em `url` e `text`:
+
+```json
+{
+  "actions": [
+    { "name": "goto", "params": { "url": "https://{{dominio}}/login" } },
+    { "name": "fill", "params": { "selector": "input#email", "text": "{{email}}" } }
+  ]
+}
+```
+
+Ao executar, o sistema detecta `dominio` e `email` e abre um diálogo para preenchê-los. Os valores são substituídos em todo o workflow antes da execução.
+
+---
+
 ## Interface (UI)
 
 ### Painel esquerdo
@@ -137,6 +156,7 @@ webflow/
     │   └── runner.py       # Executa workflow em thread, redireciona stdout para a queue
     └── utils/
         ├── workflow_runner.py  # load_workflow_from_json, run_workflow_sync
+        ├── template_utils.py   # Extrai e substitui variáveis {{var}} em workflows
         ├── make_workflows_by_step.py  # Monta workflow a partir de vários steps
         ├── steps_finder.py
         └── workflows_finder.py
@@ -157,5 +177,6 @@ webflow/
 
 1. **Steps**: crie em `steps/` pela UI (actions + params); use **Testar** para rodar só aquele step.
 2. **Workflows**: monte em `workflows/` a partir de steps ou edite o JSON; selecione na lista e use **Executar workflow selecionado**.
-3. A saída de qualquer execução aparece na **janela de console** que abre automaticamente.
-4. Para reCAPTCHA v2, configure `CAPTCHA_API_KEY` no `.env`.
+3. Use **templates** `{{var}}` em parâmetros (url, text, etc.); ao executar, um diálogo pede os valores.
+4. A saída de qualquer execução aparece na **janela de console** que abre automaticamente.
+5. Para reCAPTCHA v2, configure `CAPTCHA_API_KEY` no `.env`.
