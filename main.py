@@ -1,6 +1,3 @@
-def main():
-    print("Hello from webflow!")
+from dotenv import load_dotenv
 
-
-if __name__ == "__main__":
-    main()
+load_dotenv()
