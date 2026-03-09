@@ -1,13 +1,30 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import subprocess
+import sys
 import tkinter as tk
 from tkinter import ttk
 
 from src.ui.app import App
 
 
+def _ensure_playwright_browsers():
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            browser.close()
+    except Exception:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            check=False,
+        )
+
+
 def main():
+    _ensure_playwright_browsers()
     root = tk.Tk()
     root.title("WebFlow - Gerenciador de Workflows")
     root.geometry("900x700")
