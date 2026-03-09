@@ -175,7 +175,7 @@ webflow/
 
 ## Resumo rápido
 
-1. **Steps**: crie em `steps/` pela UI (actions + params); use **Testar** para rodar só aquele step.
+1. **Steps**: crie em `steps/` pela UI (actions + params);
 2. **Workflows**: monte em `workflows/` a partir de steps ou edite o JSON; selecione na lista e use **Executar workflow selecionado**.
 3. Use **templates** `{{var}}` em parâmetros (url, text, etc.); ao executar, um diálogo pede os valores.
 4. A saída de qualquer execução aparece na **janela de console** que abre automaticamente.
